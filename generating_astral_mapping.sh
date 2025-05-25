@@ -112,7 +112,9 @@ python3 - << EOF
 import sys
 
 # 从 Bash 获取基础物种名列表
-base_names = $PYTHON_BASE_NAMES
+_base_names_from_bash = $PYTHON_BASE_NAMES
+# 清理每个基础名称，移除可能由脚本文件行尾符引入的多余空白/回车符，或定义时意外引入的空白
+base_names = [bn.strip() for bn in _base_names_from_bash]
 # 按长度降序排序，确保优先匹配长名称 (如亚种名)
 base_names.sort(key=len, reverse=True)
 
