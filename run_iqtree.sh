@@ -77,7 +77,7 @@ for fasta_file in "$INPUT_DIR"/*_codon.clipkit.fasta; do
         # --quiet: 减少输出信息，避免日志过于庞大
         
         # 中文注释：实际执行的命令 (DNA 模型)
-        $IQTree_CMD -s "$fasta_file" -B 1000 -m GTR+G+I -T $THREADS_PER_JOB --prefix "$OUTPUT_DIR/$base_name" --quiet &
+        $IQTree_CMD -s "$fasta_file" -B 1000 -m GTR+G+I -T $THREADS_PER_JOB --wbt --prefix "$OUTPUT_DIR/$base_name" --quiet &
 
         # 中文注释：备选方案：使用密码子模型 (例如 GTR+G+I+F)。
         # 密码子模型 (-st CODON -m MFP) 通常更为准确，但计算量巨大，耗时很长。

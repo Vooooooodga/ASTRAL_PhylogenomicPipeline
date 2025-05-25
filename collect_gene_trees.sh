@@ -5,7 +5,7 @@
 # --- 用户可配置变量 ---
 # 中文注释：包含 IQ-TREE 输出基因树文件 (.treefile) 的目录 (例如：/home/user/results/iqtree_gene_trees)
 GENE_TREES_DIR=""
-# 中文注释：合并后的基因树文件的输出路径和文件名 (例如：/home/user/results/all_gene_trees.txt)
+# 中文注释：合并后的基因树文件的输出路径和文件名 (例如：/home/user/results/all_gene_trees.nwk)
 OUTPUT_MERGED_TREES_FILE=""
 
 # --- 脚本主要逻辑 ---

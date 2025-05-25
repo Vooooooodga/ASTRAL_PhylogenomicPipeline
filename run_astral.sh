@@ -7,11 +7,15 @@
 INPUT_MERGED_TREES_FILE=""
 # 中文注释：ASTRAL 输出的物种树文件名 (例如：/home/user/results/species_tree.tre)
 OUTPUT_SPECIES_TREE_FILE=""
-# 中文注释：ASTRAL .jar 文件的路径 (例如：/path/to/astral.5.7.8.jar)
-# 如果 astral 在系统 PATH 中并且可以直接作为命令运行，可以将此设置为空或 "astral"
-ASTRAL_JAR_PATH=""
-# 中文注释：ASTRAL运行时可分配的最大内存 (例如："4G" 表示 4 Gigabytes)
-ASTRAL_MEMORY="4G"
+# 中文注释：ASTRAL 的可执行命令。可以是简单的命令名 (如 'astral')，
+# 也可以是完整的路径 (如 '/usr/local/bin/astral')，
+# 或者是包含容器执行的命令 (如 'singularity exec ... astral')。
+# 用户负责确保此命令能正确调用 ASTRAL，并处理 Java 内存 (如果需要，可通过 ASTRAL_JAVA_MEMORY 和 _JAVA_OPTIONS)。
+ASTRAL_EXEC_COMMAND="singularity exec /usr/local/biotools/a/astral-tree:5.7.8--hdfd78af_0 astral"
+# 中文注释：期望传递给 Java 运行 ASTRAL 的最大内存 (例如："4G" 表示 4 Gigabytes)。
+# 注意：此设置将通过 _JAVA_OPTIONS 环境变量尝试传递给 Java。它的实际效果
+# 取决于 ASTRAL_EXEC_COMMAND 中的命令如何最终调用 Java 进程。
+ASTRAL_JAVA_MEMORY="4G"
 
 # --- 脚本主要逻辑 ---
 
@@ -31,17 +35,10 @@ if [ -z "$OUTPUT_SPECIES_TREE_FILE" ]; then
     exit 1
 fi
 
-# 中文注释：检查 ASTRAL JAR 路径是否提供 (如果直接用 astral 命令，则不需要)
-if [ -z "$ASTRAL_JAR_PATH" ]; then
-    echo "信息：未指定 ASTRAL_JAR_PATH，将尝试直接使用 'astral' 命令。请确保 astral 已安装并配置在系统 PATH 中。"
-    ASTRAL_CMD="astral"
-else
-    if [ ! -f "$ASTRAL_JAR_PATH" ]; then
-        echo "错误：ASTRAL jar 文件 '$ASTRAL_JAR_PATH' 不存在。"
-        exit 1
-    fi
-    ASTRAL_CMD="java -Xmx${ASTRAL_MEMORY} -jar $ASTRAL_JAR_PATH"
-echo "使用 ASTRAL JAR: $ASTRAL_JAR_PATH"
+# 中文注释：检查 ASTRAL 执行命令是否提供
+if [ -z "$ASTRAL_EXEC_COMMAND" ]; then
+    echo "错误：ASTRAL_EXEC_COMMAND (ASTRAL 执行命令) 未设置。"
+    exit 1
 fi
 
 echo "=================================================="
@@ -49,8 +46,8 @@ echo "            开始运行 ASTRAL 构建物种树             "
 echo "=================================================="
 echo "输入合并基因树文件: $INPUT_MERGED_TREES_FILE"
 echo "输出物种树文件: $OUTPUT_SPECIES_TREE_FILE"
-echo "ASTRAL 命令: $ASTRAL_CMD"
-echo "ASTRAL 最大内存: $ASTRAL_MEMORY"
+echo "ASTRAL 执行命令: $ASTRAL_EXEC_COMMAND"
+echo "ASTRAL Java 内存 (尝试通过 _JAVA_OPTIONS): $ASTRAL_JAVA_MEMORY"
 echo "--------------------------------------------------"
 
 # 中文注释：运行 ASTRAL
@@ -58,25 +55,33 @@ echo "--------------------------------------------------"
 # -o: 输出物种树文件
 # ASTRAL 会自动处理带自举支持的基因树
 
-# 中文注释：ASTRAL 的输出通常直接到标准输出，如果指定 -o，则输出到文件。
-# 同时，ASTRAL 可能会在标准错误输出一些日志信息。
-# 我们将标准输出重定向到指定的输出文件，标准错误也重定向，以便调试。
-
 echo "正在运行 ASTRAL... 这可能需要一些时间，具体取决于基因树的数量和大小。"
 
-$ASTRAL_CMD -i "$INPUT_MERGED_TREES_FILE" -o "$OUTPUT_SPECIES_TREE_FILE" 2> "${OUTPUT_SPECIES_TREE_FILE%.*}.log"
+# 中文注释：设置 _JAVA_OPTIONS 环境变量，尝试将内存设置传递给 ASTRAL 内部的 Java 调用。
+# 然后执行 ASTRAL 命令，并将标准错误输出重定向到日志文件。
+export _JAVA_OPTIONS="-Xmx${ASTRAL_JAVA_MEMORY}"
+echo "设置 _JAVA_OPTIONS=${_JAVA_OPTIONS}" # 显示设置，便于调试
+
+$ASTRAL_EXEC_COMMAND -i "$INPUT_MERGED_TREES_FILE" -o "$OUTPUT_SPECIES_TREE_FILE" 2> "${OUTPUT_SPECIES_TREE_FILE%.*}.log"
+
+exit_code=$?
+
+# 中文注释：清理环境变量
+unset _JAVA_OPTIONS
+echo "已取消设置 _JAVA_OPTIONS"
 
 # 中文注释：检查 ASTRAL 是否成功运行
 # ASTRAL 成功时返回码为 0
-if [ $? -eq 0 ]; then
+if [ $exit_code -eq 0 ]; then
     echo "--------------------------------------------------"
     echo "ASTRAL 成功完成！"
     echo "物种树保存在: $OUTPUT_SPECIES_TREE_FILE"
     echo "ASTRAL 日志保存在: ${OUTPUT_SPECIES_TREE_FILE%.*}.log"
 else
     echo "--------------------------------------------------"
-    echo "错误：ASTRAL 运行失败。"
+    echo "错误：ASTRAL 运行失败 (退出码: $exit_code)。"
     echo "请检查日志文件: ${OUTPUT_SPECIES_TREE_FILE%.*}.log 获取更多信息。"
+    echo "同时检查 _JAVA_OPTIONS 是否被 ASTRAL 命令正确解析。"
     echo "=================================================="
     exit 1
 fi
