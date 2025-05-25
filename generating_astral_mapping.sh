@@ -2,9 +2,9 @@
 
 # --- 配置 ---
 # 包含 .treefile 文件的目录
-IQ_TREE_DIR="iqtree_results"
+IQ_TREE_DIR="gene_trees"
 # 输出的映射文件名
-OUTPUT_MAP_FILE="mapping.txt"
+OUTPUT_MAP_FILE="astral_mapping.txt"
 # 临时文件，用于存放所有叶节点名
 LEAF_NAMES_TMP="all_leaf_names.tmp"
 
