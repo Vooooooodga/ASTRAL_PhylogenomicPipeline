@@ -1,16 +1,24 @@
 #!/bin/bash
 
+#SBATCH --job-name=iqtree_gene_trees # 中文注释：作业名称，修改为更相关的名称
+#SBATCH --output=iqtree_gene_trees_%j.out # 中文注释：标准输出文件
+#SBATCH --error=iqtree_gene_trees_%j.err  # 中文注释：标准错误文件
+#SBATCH -N 1                             # 中文注释：请求1个节点
+#SBATCH -n 1                             # 中文注释：在该节点上运行1个任务 (整个bash脚本视为1个任务)
+#SBATCH --cpus-per-task=32               # 中文注释：为该任务请求32个CPU核心
+#SBATCH --mem=64G                        # 中文注释：请求64GB内存
+
 # 中文注释：脚本功能：并行运行 IQ-TREE 构建基因树
 
 # --- 用户可配置变量 ---
 # 中文注释：输入包含 FASTA 文件的目录 (例如：/home/user/data/msa_files)
-INPUT_DIR=""
+INPUT_DIR="/home/yuhangjia/data/AlternativeSplicing/msa-iqtree/SCOGs_msa_codon_clipkit"
 # 中文注释：输出 IQ-TREE 结果的目录 (例如：/home/user/results/iqtree_gene_trees)
-OUTPUT_DIR=""
+OUTPUT_DIR="/home/yuhangjia/data/AlternativeSplicing/msa-iqtree/gene_trees"
 # 中文注释：IQ-TREE 可执行文件的路径 (如果 iqtree2 不在系统 PATH 中，请指定完整路径，例如：/usr/local/bin/iqtree2)
-IQTree_CMD="iqtree2"
+IQTree_CMD="singularity exec /usr/local/biotools/i/iqtree:2.3.6--h503566f_1 iqtree"
 # 中文注释：并行运行的 IQ-TREE 任务数量 (例如：8)
-NUM_JOBS=4
+NUM_JOBS=8 # 修改这里，以充分利用32个核心 (32核心 / 每个任务4核心 = 8个任务)
 # 中文注释：每个 IQ-TREE 任务使用的 CPU 核心数 (固定为 4)
 THREADS_PER_JOB=4 # 非常重要: 确保每个 IQ-TREE 实例只占用4 CPU 核心
 
