@@ -108,7 +108,7 @@ echo "  -> 正在匹配基础物种名并生成 $OUTPUT_MAP_FILE..."
 # 将 Bash 数组转换为 Python 可读的列表字符串
 PYTHON_BASE_NAMES="['$(printf "', '" "${BASE_NAMES[@]}")']"
 
-python3 - << EOF
+python3 - << EOF 2> python_debug_output.txt
 import sys
 
 # 从 Bash 获取基础物种名列表
