@@ -113,10 +113,39 @@ import sys
 
 # 从 Bash 获取基础物种名列表
 _base_names_from_bash = $PYTHON_BASE_NAMES
-# 清理每个基础名称，移除可能由脚本文件行尾符引入的多余空白/回车符，或定义时意外引入的空白
-base_names = [bn.strip() for bn in _base_names_from_bash]
+
+print("--- PYTHON SCRIPT DEBUG INFO ---", file=sys.stderr)
+print(f"1. Raw _base_names_from_bash (type: {type(_base_names_from_bash)}):", file=sys.stderr)
+try:
+    print(f"  repr: {repr(_base_names_from_bash)}", file=sys.stderr)
+    if isinstance(_base_names_from_bash, list) and _base_names_from_bash:
+        print(f"  First element raw: '{_base_names_from_bash[0]}', repr: {repr(_base_names_from_bash[0])}", file=sys.stderr)
+        print(f"  Last element raw: '{_base_names_from_bash[-1]}', repr: {repr(_base_names_from_bash[-1])}", file=sys.stderr)
+except Exception as e:
+    print(f"  Error printing _base_names_from_bash details: {e}", file=sys.stderr)
+
+# 清理每个基础名称，移除可能由脚本文件行尾符引入的多余空白/回车符
+try:
+    base_names = [bn.strip() for bn in _base_names_from_bash]
+except TypeError:
+    print("ERROR: _base_names_from_bash is not iterable!", file=sys.stderr)
+    sys.exit(1)
+
+print(f"2. Cleaned base_names (type: {type(base_names)}, count: {len(base_names)}):", file=sys.stderr)
+if base_names:
+    print(f"  First element cleaned: '{base_names[0]}', repr: {repr(base_names[0])}", file=sys.stderr)
+    print(f"  Last element cleaned: '{base_names[-1]}', repr: {repr(base_names[-1])}", file=sys.stderr)
+else:
+    print("  base_names is empty after cleaning.", file=sys.stderr)
+
 # 按长度降序排序，确保优先匹配长名称 (如亚种名)
 base_names.sort(key=len, reverse=True)
+print(f"3. Sorted base_names (count: {len(base_names)}):", file=sys.stderr)
+if base_names:
+    print(f"  First element sorted (longest): '{base_names[0]}', repr: {repr(base_names[0])}", file=sys.stderr)
+    print(f"  Last element sorted (shortest): '{base_names[-1]}', repr: {repr(base_names[-1])}", file=sys.stderr)
+else:
+    print("  base_names is empty after sorting.", file=sys.stderr)
 
 # 初始化映射字典
 mapping = {bn: [] for bn in base_names}
@@ -128,8 +157,56 @@ try:
     with open('$LEAF_NAMES_TMP', 'r') as f:
         leaf_names = [line.strip() for line in f if line.strip()]
 except FileNotFoundError:
-    print("错误: 临时文件 '$LEAF_NAMES_TMP' 未找到。", file=sys.stderr)
+    print(f"错误: 临时文件 '$LEAF_NAMES_TMP' 未找到。", file=sys.stderr)
     sys.exit(1)
+
+print(f"4. Leaf names (count: {len(leaf_names)}):", file=sys.stderr)
+if not leaf_names:
+    print("  WARNING: leaf_names list is empty. No leaves to match.", file=sys.stderr)
+else:
+    print(f"  First leaf_name: '{leaf_names[0]}', repr: {repr(leaf_names[0])}", file=sys.stderr)
+    
+    # --- DEBUGGING A SPECIFIC CASE ---
+    test_leaf_example = "Wasmannia_auropunctata_LOC105463039" # Example from your output
+    test_base_expected_example = "Wasmannia_auropunctata"
+    print(f"5. Manual test for a specific case:", file=sys.stderr)
+    print(f"  Attempting to match leaf: '{test_leaf_example}' with expected base: '{test_base_expected_example}'", file=sys.stderr)
+
+    found_expected_base_in_list = False
+    actual_test_base_from_list = None
+    for bn_in_list in base_names:
+        if bn_in_list == test_base_expected_example:
+            actual_test_base_from_list = bn_in_list
+            found_expected_base_in_list = True
+            break
+            
+    if found_expected_base_in_list:
+        print(f"  Found expected base in list: '{actual_test_base_from_list}' (repr: {repr(actual_test_base_from_list)})", file=sys.stderr)
+        
+        is_startswith = test_leaf_example.startswith(actual_test_base_from_list)
+        print(f"    test_leaf.startswith(actual_base): {is_startswith}", file=sys.stderr)
+        
+        match_overall = False
+        if is_startswith:
+            if len(test_leaf_example) == len(actual_test_base_from_list):
+                match_overall = True
+                print(f"    len(test_leaf) == len(actual_base): True", file=sys.stderr)
+            else: # test_leaf is longer
+                idx_suffix = len(actual_test_base_from_list)
+                suffix_char = test_leaf_example[idx_suffix]
+                print(f"    Suffix char at index {idx_suffix}: '{suffix_char}'", file=sys.stderr)
+                if suffix_char in ['_', '-']:
+                    match_overall = True
+                    print(f"    Suffix char in ['_', '-']: True", file=sys.stderr)
+                else:
+                    print(f"    Suffix char in ['_', '-']: False", file=sys.stderr)
+        print(f"  Overall match for test case: {match_overall}", file=sys.stderr)
+    else:
+        print(f"  WARNING: Expected base '{test_base_expected_example}' NOT FOUND in processed base_names for manual test.", file=sys.stderr)
+        if base_names:
+             print(f"    (Sample) First base_name in list is: '{base_names[0]}' (repr: {repr(base_names[0])})", file=sys.stderr)
+    print("--- END PYTHON SCRIPT DEBUG INFO ---", file=sys.stderr)
+
 
 # 进行匹配
 for leaf in leaf_names:
