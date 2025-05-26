@@ -32,7 +32,7 @@ ASTRAL_EXEC_COMMAND="singularity exec /usr/local/biotools/a/astral-tree:5.7.8--h
 # 中文注释：期望传递给 Java 运行 ASTRAL 的最大内存 (例如："4G" 表示 4 Gigabytes)。
 # 注意：此设置将通过 _JAVA_OPTIONS 环境变量尝试传递给 Java。它的实际效果
 # 取决于 ASTRAL_EXEC_COMMAND 中的命令如何最终调用 Java 进程。
-ASTRAL_JAVA_MEMORY="64G"
+ASTRAL_JAVA_MEMORY="60G" # 从 64G 调整为 60G，为 Java 非堆内存和系统开销留出余量
 
 # --- 脚本主要逻辑 ---
 
