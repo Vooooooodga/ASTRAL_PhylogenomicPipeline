@@ -151,11 +151,25 @@ echo "正在运行 ASTRAL... 这可能需要一些时间，具体取决于基因
 
 # 中文注释：设置 _JAVA_OPTIONS 环境变量，尝试将内存设置传递给 ASTRAL 内部的 Java 调用。
 # 然后执行 ASTRAL 命令，并将标准错误输出重定向到日志文件。
-export SINGULARITYENV__JAVA_OPTIONS="-Xmx${ASTRAL_JAVA_MEMORY}"
-echo "设置 SINGULARITYENV__JAVA_OPTIONS=${SINGULARITYENV__JAVA_OPTIONS}" # 显示设置，便于调试
+export _JAVA_OPTIONS="-Xmx${ASTRAL_JAVA_MEMORY}"
+echo "设置 _JAVA_OPTIONS=${_JAVA_OPTIONS} (将通过 singularity --env 传递)" # 显示设置，便于调试
 
 # 构建 ASTRAL 命令数组
-astral_cmd_array=($ASTRAL_EXEC_COMMAND) # 方括号改为圆括号初始化数组
+# 旧的初始化方式: astral_cmd_array=($ASTRAL_EXEC_COMMAND)
+
+# 新的初始化方式，以通过 --env 传递 _JAVA_OPTIONS
+# ASTRAL_EXEC_COMMAND 格式假定为 "singularity exec <image_path> <command_in_image>"
+# 例如: "singularity exec /path/to/image.sif astral_command"
+
+# 提取 "singularity exec " 之后的部分 (即 "<image_path> <command_in_image>")
+remaining_args="${ASTRAL_EXEC_COMMAND#singularity exec }"
+# 将剩余参数安全地解析到数组中，以正确处理任何潜在的空格（尽管在此特定示例中镜像路径和命令不包含空格）
+read -ra image_and_command_elements <<< "$remaining_args"
+
+astral_cmd_array=("singularity" "exec")
+astral_cmd_array+=("--env" "_JAVA_OPTIONS=${_JAVA_OPTIONS}") # 明确传递 _JAVA_OPTIONS 的当前值
+astral_cmd_array+=("${image_and_command_elements[@]}")     # 添加解析出的镜像路径和镜像内命令
+
 astral_cmd_array+=(-i "$INPUT_MERGED_TREES_FILE")
 astral_cmd_array+=(-o "$OUTPUT_SPECIES_TREE_FILE")
 
@@ -176,8 +190,8 @@ echo "执行命令: ${astral_cmd_array[@]}"
 exit_code=$?
 
 # 中文注释：清理环境变量
-unset SINGULARITYENV__JAVA_OPTIONS
-echo "已取消设置 SINGULARITYENV__JAVA_OPTIONS"
+unset _JAVA_OPTIONS
+echo "已取消设置 _JAVA_OPTIONS"
 
 # 中文注释：检查 ASTRAL 是否成功运行
 # ASTRAL 成功时返回码为 0
