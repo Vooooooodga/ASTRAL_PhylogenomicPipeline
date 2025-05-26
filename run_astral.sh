@@ -24,7 +24,7 @@ ASTRAL_EXEC_COMMAND="singularity exec /usr/local/biotools/a/astral-tree:5.7.8--h
 # 中文注释：期望传递给 Java 运行 ASTRAL 的最大内存 (例如："4G" 表示 4 Gigabytes)。
 # 注意：此设置将通过 _JAVA_OPTIONS 环境变量尝试传递给 Java。它的实际效果
 # 取决于 ASTRAL_EXEC_COMMAND 中的命令如何最终调用 Java 进程。
-ASTRAL_JAVA_MEMORY="8G"
+ASTRAL_JAVA_MEMORY="30G"
 
 # --- 脚本主要逻辑 ---
 
@@ -150,6 +150,9 @@ echo "设置 _JAVA_OPTIONS=${_JAVA_OPTIONS}" # 显示设置，便于调试
 astral_cmd_array=($ASTRAL_EXEC_COMMAND) # 方括号改为圆括号初始化数组
 astral_cmd_array+=(-i "$INPUT_MERGED_TREES_FILE")
 astral_cmd_array+=(-o "$OUTPUT_SPECIES_TREE_FILE")
+
+# 添加外群参数
+astral_cmd_array+=(--outgroup "Drosophila_melanogaster")
 
 if [ -n "$ASTRAL_MAPPING_FILE" ]; then
     astral_cmd_array+=(-a "$ASTRAL_MAPPING_FILE")
