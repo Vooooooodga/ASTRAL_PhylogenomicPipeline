@@ -106,16 +106,16 @@ if [ -n "$_first_tree_file_for_debug" ]; then
     echo "DEBUG: 该文件的前3行内容是:"
     head -n 3 "$_first_tree_file_for_debug"
     echo "DEBUG: 对该文件运行 grep 命令的输出 (最多显示5条匹配):"
-    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$_first_tree_file_for_debug" | head -n 5
+    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[\d.eE+-]+' "$_first_tree_file_for_debug" | head -n 5
     echo "DEBUG: 对该文件运行 grep | sed 管道命令的输出 (最多显示5条匹配):"
-    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$_first_tree_file_for_debug" | \
+    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[\d.eE+-]+' "$_first_tree_file_for_debug" | \
         sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | head -n 5
 else
     echo "DEBUG: 在 $IQ_TREE_DIR 目录中未找到用于调试的 .treefile 文件。"
 fi
 # --- END DEBUG ---
 
-grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$IQ_TREE_DIR"/*.treefile | \
+grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[\d.eE+-]+' "$IQ_TREE_DIR"/*.treefile | \
     sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | \
     sort | \
     uniq > "$LEAF_NAMES_TMP"
@@ -186,8 +186,7 @@ except IOError:
 
 # 报告未匹配项 (如果有)
 if unmatched and leaf_names: # 只在确实有叶节点尝试匹配时报告
-    print("
-⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
+    print("\n⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
     for u in unmatched:
         print(f"  - {u}", file=sys.stderr)
     print("  -> 请检查您的 BASE_NAMES 列表是否完整，或叶节点命名是否符合预期。", file=sys.stderr)
