@@ -96,7 +96,7 @@ echo "🗺️ 开始生成 ASTRAL 映射文件..."
 
 # 1. 提取所有唯一的叶节点名
 echo "  -> 正在从 $IQ_TREE_DIR/*.treefile 提取所有叶节点名..."
-grep -Pho '(?<=[,(])\\s*[^():;,\\\\[\\\\]]+\\s*(?=:[\ \\d.eE+-]+)\' "$IQ_TREE_DIR"/*.treefile | \
+grep -Pho '''(?<=[,(])\\s*[^():;,\\\\[\\\\]]+\\s*(?=:[\d.eE+-]+)''' "$IQ_TREE_DIR"/*.treefile | \
     sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | \
     sort | \
     uniq > "$LEAF_NAMES_TMP"
@@ -105,40 +105,18 @@ echo "  -> 找到 $(wc -l < "$LEAF_NAMES_TMP") 个独特的叶节点名。"
 # 2. 使用 Python 进行最长前缀匹配并生成映射文件
 echo "  -> 正在匹配基础物种名并生成 $OUTPUT_MAP_FILE..."
 
-# --- DEBUG: Check BASE_NAMES status ---
-echo "DEBUG (Bash): Count of BASE_NAMES: ${#BASE_NAMES[@]}"
-if [ "${#BASE_NAMES[@]}" -gt 0 ]; then
-    echo "DEBUG (Bash): First element of BASE_NAMES: '${BASE_NAMES[0]}'"
-    echo "DEBUG (Bash): Last element of BASE_NAMES: '${BASE_NAMES[${#BASE_NAMES[@]}-1]}'" # More compatible way for last element
-else
-    echo "DEBUG (Bash): BASE_NAMES array is empty!"
-fi
-# --- END DEBUG ---
-
 # 将 Bash 数组转换为 Python 可读的列表字符串
 _python_list_content=""
 if [ "${#BASE_NAMES[@]}" -gt 0 ]; then
-    _python_list_content=$(printf "'%s'," "${BASE_NAMES[@]}" | sed 's/,$//')
+    _python_list_content=$(printf "'''%s'''," "${BASE_NAMES[@]}" | sed 's/,$//')
 fi
 PYTHON_BASE_NAMES="[${_python_list_content}]"
-echo "DEBUG (Bash): Generated PYTHON_BASE_NAMES string: $PYTHON_BASE_NAMES" # Added for clarity
 
-python3 - << EOF 2> python_debug_output.txt
+python3 - << EOF
 import sys
 
 # 从 Bash 获取基础物种名列表
 _base_names_from_bash = $PYTHON_BASE_NAMES
-
-print("--- PYTHON SCRIPT DEBUG INFO ---", file=sys.stderr)
-print(f"1. Raw _base_names_from_bash (type: {type(_base_names_from_bash)}):", file=sys.stderr)
-try:
-    print(f"  repr: {repr(_base_names_from_bash)}", file=sys.stderr)
-    if isinstance(_base_names_from_bash, list) and _base_names_from_bash:
-        print(f"  First element raw: '{_base_names_from_bash[0]}', repr: {repr(_base_names_from_bash[0])}", file=sys.stderr)
-        print(f"  Last element raw: '{_base_names_from_bash[-1]}', repr: {repr(_base_names_from_bash[-1])}", file=sys.stderr)
-except Exception as e:
-    print(f"  Error printing _base_names_from_bash details: {e}", file=sys.stderr)
-
 # 清理每个基础名称，移除可能由脚本文件行尾符引入的多余空白/回车符
 try:
     base_names = [bn.strip() for bn in _base_names_from_bash]
@@ -146,21 +124,8 @@ except TypeError:
     print("ERROR: _base_names_from_bash is not iterable!", file=sys.stderr)
     sys.exit(1)
 
-print(f"2. Cleaned base_names (type: {type(base_names)}, count: {len(base_names)}):", file=sys.stderr)
-if base_names:
-    print(f"  First element cleaned: '{base_names[0]}', repr: {repr(base_names[0])}", file=sys.stderr)
-    print(f"  Last element cleaned: '{base_names[-1]}', repr: {repr(base_names[-1])}", file=sys.stderr)
-else:
-    print("  base_names is empty after cleaning.", file=sys.stderr)
-
 # 按长度降序排序，确保优先匹配长名称 (如亚种名)
 base_names.sort(key=len, reverse=True)
-print(f"3. Sorted base_names (count: {len(base_names)}):", file=sys.stderr)
-if base_names:
-    print(f"  First element sorted (longest): '{base_names[0]}', repr: {repr(base_names[0])}", file=sys.stderr)
-    print(f"  Last element sorted (shortest): '{base_names[-1]}', repr: {repr(base_names[-1])}", file=sys.stderr)
-else:
-    print("  base_names is empty after sorting.", file=sys.stderr)
 
 # 初始化映射字典
 mapping = {bn: [] for bn in base_names}
@@ -174,54 +139,6 @@ try:
 except FileNotFoundError:
     print(f"错误: 临时文件 '$LEAF_NAMES_TMP' 未找到。", file=sys.stderr)
     sys.exit(1)
-
-print(f"4. Leaf names (count: {len(leaf_names)}):", file=sys.stderr)
-if not leaf_names:
-    print("  WARNING: leaf_names list is empty. No leaves to match.", file=sys.stderr)
-else:
-    print(f"  First leaf_name: '{leaf_names[0]}', repr: {repr(leaf_names[0])}", file=sys.stderr)
-    
-    # --- DEBUGGING A SPECIFIC CASE ---
-    test_leaf_example = "Wasmannia_auropunctata_LOC105463039" # Example from your output
-    test_base_expected_example = "Wasmannia_auropunctata"
-    print(f"5. Manual test for a specific case:", file=sys.stderr)
-    print(f"  Attempting to match leaf: '{test_leaf_example}' with expected base: '{test_base_expected_example}'", file=sys.stderr)
-
-    found_expected_base_in_list = False
-    actual_test_base_from_list = None
-    for bn_in_list in base_names:
-        if bn_in_list == test_base_expected_example:
-            actual_test_base_from_list = bn_in_list
-            found_expected_base_in_list = True
-            break
-            
-    if found_expected_base_in_list:
-        print(f"  Found expected base in list: '{actual_test_base_from_list}' (repr: {repr(actual_test_base_from_list)})", file=sys.stderr)
-        
-        is_startswith = test_leaf_example.startswith(actual_test_base_from_list)
-        print(f"    test_leaf.startswith(actual_base): {is_startswith}", file=sys.stderr)
-        
-        match_overall = False
-        if is_startswith:
-            if len(test_leaf_example) == len(actual_test_base_from_list):
-                match_overall = True
-                print(f"    len(test_leaf) == len(actual_base): True", file=sys.stderr)
-            else: # test_leaf is longer
-                idx_suffix = len(actual_test_base_from_list)
-                suffix_char = test_leaf_example[idx_suffix]
-                print(f"    Suffix char at index {idx_suffix}: '{suffix_char}'", file=sys.stderr)
-                if suffix_char in ['_', '-']:
-                    match_overall = True
-                    print(f"    Suffix char in ['_', '-']: True", file=sys.stderr)
-                else:
-                    print(f"    Suffix char in ['_', '-']: False", file=sys.stderr)
-        print(f"  Overall match for test case: {match_overall}", file=sys.stderr)
-    else:
-        print(f"  WARNING: Expected base '{test_base_expected_example}' NOT FOUND in processed base_names for manual test.", file=sys.stderr)
-        if base_names:
-             print(f"    (Sample) First base_name in list is: '{base_names[0]}' (repr: {repr(base_names[0])})", file=sys.stderr)
-    print("--- END PYTHON SCRIPT DEBUG INFO ---", file=sys.stderr)
-
 
 # 进行匹配
 for leaf in leaf_names:
@@ -242,47 +159,19 @@ try:
         for base, leaves in mapping.items():
             # 只为那些实际有叶节点匹配的基础物种名写入条目
             if leaves:
-                out.write(f'{base}: {",".join(leaves)}\n')
+                out.write(f'{base}: {",".join(leaves)}\\n')
 except IOError:
     print("错误: 无法写入输出文件 '$OUTPUT_MAP_FILE'。", file=sys.stderr)
     sys.exit(1)
 
 # 报告未匹配项 (如果有)
 if unmatched:
-    print("\n⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
-    numeric_unmatched_for_file = []
+    print("\\n⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
     for u in unmatched:
         print(f"  - {u}", file=sys.stderr)
-        if u.isdigit(): # 检查是否为纯数字
-            numeric_unmatched_for_file.append(u)
     print("  -> 请检查您的 BASE_NAMES 列表是否完整，或叶节点命名是否符合预期。", file=sys.stderr)
 
-    if numeric_unmatched_for_file:
-        try:
-            with open('numeric_unmatched_leaves.tmp', 'w') as nuf:
-                for num_leaf in numeric_unmatched_for_file:
-                    nuf.write(f"{num_leaf}\n")
-            # 打印到标准输出，以便用户在终端看到此信息
-            print("\nℹ️ INFO: 检测到纯数字的未匹配叶节点名。")
-            print("    它们的列表已临时保存，脚本现在将尝试在原始 .treefile 文件中查找这些数字叶节点的来源...")
-        except IOError:
-            print("错误: 无法写入 'numeric_unmatched_leaves.tmp' 文件。", file=sys.stderr)
-
 EOF
-
-# 新增：查找数字型未匹配叶节点的来源文件
-if [ -f "numeric_unmatched_leaves.tmp" ]; then
-    echo # 添加空行以改善格式
-    echo "🔎 正在查找纯数字型未匹配叶节点的来源文件..."
-    while IFS= read -r numeric_leaf_name || [ -n "$numeric_leaf_name" ]; do
-        if [ -n "$numeric_leaf_name" ]; then # 确保行不为空
-            echo "  -> 搜索数字叶节点: '$numeric_leaf_name' (在 $IQ_TREE_DIR/*.treefile 中查找 '${numeric_leaf_name}:')"
-            grep -H -- "${numeric_leaf_name}:" "$IQ_TREE_DIR"/*.treefile
-        fi
-    done < "numeric_unmatched_leaves.tmp"
-    rm "numeric_unmatched_leaves.tmp"
-    echo "✅ 数字型未匹配叶节点来源搜索完成。"
-fi
 
 # 3. 清理临时文件
 rm "$LEAF_NAMES_TMP"
