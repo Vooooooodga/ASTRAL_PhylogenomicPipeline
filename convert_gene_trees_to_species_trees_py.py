@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 import multiprocessing
+import re # 新增导入
 
 def parse_mapping_file(mapping_file_path):
     """
@@ -64,24 +65,47 @@ def parse_mapping_file(mapping_file_path):
 def process_tree_content(tree_content, gene_to_species_map):
     """
     替换树文件内容中的基因名为物种名。
-    基因名按长度降序排序后进行替换，以正确处理子字符串情况。
-    替换 "基因名:" 为 "物种名:"。
+    对每个物种，构建其所有对应基因名的正则表达式，然后执行一次 re.sub。
     """
     modified_content = tree_content
-    
-    # 按基因名长度降序排序，确保长名优先替换 (例如 "ABC_1" 在 "ABC" 之前)
-    # 这对于 simple string.replace(f"{gene}:", f"{species}:") 策略很重要
-    # 对于超大量替换规则和超长字符串，此方法仍可能较慢，但对于一般树文件是合理的。
-    sorted_gene_names = sorted(gene_to_species_map.keys(), key=len, reverse=True)
 
-    for gene_name in sorted_gene_names:
-        species_name = gene_to_species_map[gene_name]
+    if not gene_to_species_map: # 如果映射为空，直接返回原始内容
+        return modified_content
+
+    # 1. 构建物种到基因列表的映射
+    species_to_genes_map = {}
+    for gene, species in gene_to_species_map.items():
+        if species not in species_to_genes_map:
+            species_to_genes_map[species] = []
+        species_to_genes_map[species].append(gene)
+
+    # 2. 遍历每个物种，为其关联的基因执行一次 re.sub
+    for species_name, gene_names_list in species_to_genes_map.items():
+        if not gene_names_list: # 如果该物种没有关联的基因，则跳过
+            continue
+
+        # 为当前物种的所有基因名构建正则表达式
+        # (?:geneA_escaped|geneB_escaped|geneC_escaped):  <-- 注意末尾的冒号
+        # 使用 re.escape() 处理基因名中的特殊字符
+        # 按基因名长度降序排序，确保长名优先匹配 (例如 "ABC_1" 在 "ABC" 之前)
+        # 这有助于在同一个物种的基因列表中处理潜在的子字符串问题。
+        sorted_gene_names_for_species = sorted(gene_names_list, key=len, reverse=True)
+        escaped_gene_names = [re.escape(g) for g in sorted_gene_names_for_species]
         
-        find_pattern = f"{gene_name}:"
-        replace_with = f"{species_name}:"
-        modified_content = modified_content.replace(find_pattern, replace_with)
+        # 构建形如 (gene1|gene2|gene3): 的模式
+        # 使用非捕获组 (?:...)
+        pattern_string = r"(?:" + "|".join(escaped_gene_names) + r")(?=:)" # 正向预查冒号
+        # 替换字符串是 "物种名:" 但冒号由预查处理，所以只替换物种名本身
+        replacement_string = species_name
+
+        # 执行替换
+        # 这里我们用 pattern_string 匹配基因名本身（其后必须紧跟冒号）
+        # 然后用 species_name 替换掉匹配到的基因名。
+        # 冒号本身不会被替换，因为它在预查组里。
+        modified_content = re.sub(pattern_string, replacement_string, modified_content)
         
     return modified_content
+
 
 def process_single_tree_file(input_path, output_path, gene_to_species_map):
     """
