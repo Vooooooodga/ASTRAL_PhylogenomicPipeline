@@ -177,6 +177,9 @@ astral_cmd_array+=(-o "$OUTPUT_SPECIES_TREE_FILE")
 # 添加外群参数
 astral_cmd_array+=(--outgroup "Drosophila_melanogaster")
 
+# 添加 -r 参数
+astral_cmd_array+=(-r 1000)
+
 # if [ -n "$ASTRAL_MAPPING_FILE" ]; then # COMMENTED OUT: 不再添加 -a
 #     astral_cmd_array+=(-a "$ASTRAL_MAPPING_FILE") # COMMENTED OUT
 #     astral_cmd_array+=(-R) # COMMENTED OUT: -R 通常与 -a 配合，此处也注释掉
