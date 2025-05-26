@@ -5,7 +5,7 @@
 #SBATCH --error=astral_species_tree_%j.err
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --mem=32G
 
 # 中文注释：脚本功能：使用 ASTRAL 基于合并后的基因树文件构建物种树
@@ -151,8 +151,8 @@ echo "正在运行 ASTRAL... 这可能需要一些时间，具体取决于基因
 
 # 中文注释：设置 _JAVA_OPTIONS 环境变量，尝试将内存设置传递给 ASTRAL 内部的 Java 调用。
 # 然后执行 ASTRAL 命令，并将标准错误输出重定向到日志文件。
-export _JAVA_OPTIONS="-Xmx${ASTRAL_JAVA_MEMORY}"
-echo "设置 _JAVA_OPTIONS=${_JAVA_OPTIONS}" # 显示设置，便于调试
+export SINGULARITYENV__JAVA_OPTIONS="-Xmx${ASTRAL_JAVA_MEMORY}"
+echo "设置 SINGULARITYENV__JAVA_OPTIONS=${SINGULARITYENV__JAVA_OPTIONS}" # 显示设置，便于调试
 
 # 构建 ASTRAL 命令数组
 astral_cmd_array=($ASTRAL_EXEC_COMMAND) # 方括号改为圆括号初始化数组
@@ -176,8 +176,8 @@ echo "执行命令: ${astral_cmd_array[@]}"
 exit_code=$?
 
 # 中文注释：清理环境变量
-unset _JAVA_OPTIONS
-echo "已取消设置 _JAVA_OPTIONS"
+unset SINGULARITYENV__JAVA_OPTIONS
+echo "已取消设置 SINGULARITYENV__JAVA_OPTIONS"
 
 # 中文注释：检查 ASTRAL 是否成功运行
 # ASTRAL 成功时返回码为 0
