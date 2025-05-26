@@ -78,6 +78,62 @@ echo "ASTRAL 执行命令: $ASTRAL_EXEC_COMMAND"
 echo "ASTRAL Java 内存 (尝试通过 _JAVA_OPTIONS): $ASTRAL_JAVA_MEMORY"
 echo "--------------------------------------------------"
 
+# --- 新增：检查映射文件中各物种对应的叶节点数量 ---
+if [ -n "$ASTRAL_MAPPING_FILE" ] && [ -f "$ASTRAL_MAPPING_FILE" ]; then
+    echo "INFO: 开始检查映射文件 '$ASTRAL_MAPPING_FILE' 中各物种对应的叶节点数量..."
+    first_count=""
+    all_counts_equal=true
+    declare -A species_leaf_counts # 用于存储每个物种的叶节点计数
+
+    # 读取映射文件并处理每一行
+    line_number=0
+    processed_species_count=0
+    while IFS= read -r line || [ -n "$line" ]; do # 处理可能没有换行符的最后一行
+        line_number=$((line_number + 1))
+        # 跳过空行或注释行 (如果您的映射文件可能有注释)
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+
+        # 按第一个冒号分割
+        base_species=$(echo "$line" | cut -d':' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        leaves_list=$(echo "$line" | cut -d':' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+        if [ -z "$base_species" ] || ! echo "$line" | grep -q ':'; then
+            echo "警告 (映射文件第 $line_number 行): 格式不正确或缺少冒号分隔符，已跳过: '$line'"
+            continue
+        fi
+
+        current_count=0
+        if [ -n "$leaves_list" ]; then
+            # 计算逗号分隔的叶节点数量
+            current_count=$(echo "$leaves_list" | tr ',' '\n' | wc -l)
+        fi
+        
+        species_leaf_counts["$base_species"]=$current_count
+        echo "  物种 '$base_species' 对应 $current_count 个基因树叶节点。"
+        processed_species_count=$((processed_species_count + 1))
+
+        if [ -z "$first_count" ]; then
+            first_count=$current_count
+        elif [ "$first_count" -ne "$current_count" ]; then
+            all_counts_equal=false
+        fi
+    done < "$ASTRAL_MAPPING_FILE"
+
+    if [ "$processed_species_count" -eq 0 ]; then
+        echo "警告：映射文件 '$ASTRAL_MAPPING_FILE' 为空或所有行均无法处理。"
+    elif $all_counts_equal; then
+        echo "INFO：检查完成。映射文件中所有 $processed_species_count 个已处理物种都对应相同数量 ($first_count) 的叶节点。"
+    else
+        echo "警告：检查完成。映射文件中的 $processed_species_count 个已处理物种对应的叶节点数量不完全相同。请检查以上列表。"
+    fi
+    echo "--------------------------------------------------"
+else
+    echo "INFO：未提供或未找到 ASTRAL 映射文件 '$ASTRAL_MAPPING_FILE'，跳过叶节点计数检查。"
+    echo "--------------------------------------------------"
+fi
+# --- 检查结束 ---
+
 # 中文注释：运行 ASTRAL
 # -i: 输入基因树文件
 # -o: 输出物种树文件
@@ -92,6 +148,10 @@ echo "设置 _JAVA_OPTIONS=${_JAVA_OPTIONS}" # 显示设置，便于调试
 
 # 构建 ASTRAL 命令数组
 astral_cmd_array=($ASTRAL_EXEC_COMMAND) # 方括号改为圆括号初始化数组
+# 将 Java 内存选项直接传递给 ASTRAL
+if [ -n "$ASTRAL_JAVA_MEMORY" ]; then
+    astral_cmd_array+=("-J-Xmx${ASTRAL_JAVA_MEMORY}")
+fi
 astral_cmd_array+=(-i "$INPUT_MERGED_TREES_FILE")
 astral_cmd_array+=(-o "$OUTPUT_SPECIES_TREE_FILE")
 
