@@ -5,7 +5,7 @@
 #SBATCH --error=astral_species_tree_%j.err
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=1
 #SBATCH --mem=200G
 
 # 中文注释：脚本功能：使用 ASTRAL 基于合并后的基因树文件构建物种树
