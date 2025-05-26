@@ -96,8 +96,8 @@ echo "🗺️ 开始生成 ASTRAL 映射文件..."
 
 # 1. 提取所有唯一的叶节点名
 echo "  -> 正在从 $IQ_TREE_DIR/*.treefile 提取所有叶节点名..."
-grep -Pho '''(?<=[,(])\\s*[^():;,\\\\[\\\\]]+\\s*(?=:[\d.eE+-]+)''' "$IQ_TREE_DIR"/*.treefile | \
-    sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | \
+grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$IQ_TREE_DIR"/*.treefile | \
+    sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | \
     sort | \
     uniq > "$LEAF_NAMES_TMP"
 echo "  -> 找到 $(wc -l < "$LEAF_NAMES_TMP") 个独特的叶节点名。"
@@ -108,7 +108,7 @@ echo "  -> 正在匹配基础物种名并生成 $OUTPUT_MAP_FILE..."
 # 将 Bash 数组转换为 Python 可读的列表字符串
 _python_list_content=""
 if [ "${#BASE_NAMES[@]}" -gt 0 ]; then
-    _python_list_content=$(printf "'''%s'''," "${BASE_NAMES[@]}" | sed 's/,$//')
+    _python_list_content=$(printf "'%s'," "${BASE_NAMES[@]}" | sed 's/,$//')
 fi
 PYTHON_BASE_NAMES="[${_python_list_content}]"
 
@@ -117,14 +117,14 @@ import sys
 
 # 从 Bash 获取基础物种名列表
 _base_names_from_bash = $PYTHON_BASE_NAMES
-# 清理每个基础名称，移除可能由脚本文件行尾符引入的多余空白/回车符
+# 清理每个基础名称
 try:
     base_names = [bn.strip() for bn in _base_names_from_bash]
 except TypeError:
     print("ERROR: _base_names_from_bash is not iterable!", file=sys.stderr)
     sys.exit(1)
 
-# 按长度降序排序，确保优先匹配长名称 (如亚种名)
+# 按长度降序排序，确保优先匹配长名称
 base_names.sort(key=len, reverse=True)
 
 # 初始化映射字典
@@ -140,11 +140,13 @@ except FileNotFoundError:
     print(f"错误: 临时文件 '$LEAF_NAMES_TMP' 未找到。", file=sys.stderr)
     sys.exit(1)
 
+if not leaf_names:
+    print("警告: 未从treefile中提取到任何叶节点名，映射文件可能为空或不完整。", file=sys.stderr)
+
 # 进行匹配
 for leaf in leaf_names:
     found = False
     for base in base_names:
-        # 检查是否以基础名开头，并且要么完全相同，要么后面跟 '_' 或 '-'
         if leaf.startswith(base) and (len(leaf) == len(base) or leaf[len(base)] in ['_', '-']):
             mapping[base].append(leaf)
             matched_leaves.add(leaf)
@@ -157,16 +159,17 @@ for leaf in leaf_names:
 try:
     with open('$OUTPUT_MAP_FILE', 'w') as out:
         for base, leaves in mapping.items():
-            # 只为那些实际有叶节点匹配的基础物种名写入条目
-            if leaves:
-                out.write(f'{base}: {",".join(leaves)}\\n')
+            if leaves: # 只为那些实际有叶节点匹配的基础物种名写入条目
+                out.write(f'{base}: {",".join(leaves)}
+')
 except IOError:
     print("错误: 无法写入输出文件 '$OUTPUT_MAP_FILE'。", file=sys.stderr)
     sys.exit(1)
 
 # 报告未匹配项 (如果有)
-if unmatched:
-    print("\\n⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
+if unmatched and leaf_names: # 只在确实有叶节点尝试匹配时报告
+    print("
+⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
     for u in unmatched:
         print(f"  - {u}", file=sys.stderr)
     print("  -> 请检查您的 BASE_NAMES 列表是否完整，或叶节点命名是否符合预期。", file=sys.stderr)
