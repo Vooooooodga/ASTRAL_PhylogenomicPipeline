@@ -106,17 +106,17 @@ if [ -n "$_first_tree_file_for_debug" ]; then
     echo "DEBUG: 该文件的前3行内容是:"
     head -n 3 "$_first_tree_file_for_debug"
     echo "DEBUG: 对该文件运行 grep 命令的输出 (最多显示5条匹配):"
-    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[\d.eE+-]+' "$_first_tree_file_for_debug" | head -n 5
+    grep -hoE '([,(]|^)[[:space:]]*[^():;,[:space:]]+[[:space:]]*:[[:digit:].eE+-]+' "$_first_tree_file_for_debug" | head -n 5
     echo "DEBUG: 对该文件运行 grep | sed 管道命令的输出 (最多显示5条匹配):"
-    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[\d.eE+-]+' "$_first_tree_file_for_debug" | \
-        sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | head -n 5
+    grep -hoE '([,(]|^)[[:space:]]*[^():;,[:space:]]+[[:space:]]*:[[:digit:].eE+-]+' "$_first_tree_file_for_debug" | \
+        sed -E 's/^[[:space:]]*[,(]//; s/:[[:digit:].eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | head -n 5
 else
     echo "DEBUG: 在 $IQ_TREE_DIR 目录中未找到用于调试的 .treefile 文件。"
 fi
 # --- END DEBUG ---
 
-grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[\d.eE+-]+' "$IQ_TREE_DIR"/*.treefile | \
-    sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | \
+grep -hoE '([,(]|^)[[:space:]]*[^():;,[:space:]]+[[:space:]]*:[[:digit:].eE+-]+' "$IQ_TREE_DIR"/*.treefile | \
+    sed -E 's/^[[:space:]]*[,(]//; s/:[[:digit:].eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | \
     sort | \
     uniq > "$LEAF_NAMES_TMP"
 echo "  -> 找到 $(wc -l < "$LEAF_NAMES_TMP") 个独特的叶节点名。"
