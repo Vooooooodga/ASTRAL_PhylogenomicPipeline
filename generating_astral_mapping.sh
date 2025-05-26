@@ -250,11 +250,39 @@ except IOError:
 # 报告未匹配项 (如果有)
 if unmatched:
     print("\n⚠️ 警告: 以下叶节点名未能匹配到任何基础物种名:", file=sys.stderr)
+    numeric_unmatched_for_file = []
     for u in unmatched:
         print(f"  - {u}", file=sys.stderr)
+        if u.isdigit(): # 检查是否为纯数字
+            numeric_unmatched_for_file.append(u)
     print("  -> 请检查您的 BASE_NAMES 列表是否完整，或叶节点命名是否符合预期。", file=sys.stderr)
 
+    if numeric_unmatched_for_file:
+        try:
+            with open('numeric_unmatched_leaves.tmp', 'w') as nuf:
+                for num_leaf in numeric_unmatched_for_file:
+                    nuf.write(f"{num_leaf}\n")
+            # 打印到标准输出，以便用户在终端看到此信息
+            print("\nℹ️ INFO: 检测到纯数字的未匹配叶节点名。")
+            print("    它们的列表已临时保存，脚本现在将尝试在原始 .treefile 文件中查找这些数字叶节点的来源...")
+        except IOError:
+            print("错误: 无法写入 'numeric_unmatched_leaves.tmp' 文件。", file=sys.stderr)
+
 EOF
+
+# 新增：查找数字型未匹配叶节点的来源文件
+if [ -f "numeric_unmatched_leaves.tmp" ]; then
+    echo # 添加空行以改善格式
+    echo "🔎 正在查找纯数字型未匹配叶节点的来源文件..."
+    while IFS= read -r numeric_leaf_name || [ -n "$numeric_leaf_name" ]; do
+        if [ -n "$numeric_leaf_name" ]; then # 确保行不为空
+            echo "  -> 搜索数字叶节点: '$numeric_leaf_name' (在 $IQ_TREE_DIR/*.treefile 中查找 '${numeric_leaf_name}:')"
+            grep -H -- "${numeric_leaf_name}:" "$IQ_TREE_DIR"/*.treefile
+        fi
+    done < "numeric_unmatched_leaves.tmp"
+    rm "numeric_unmatched_leaves.tmp"
+    echo "✅ 数字型未匹配叶节点来源搜索完成。"
+fi
 
 # 3. 清理临时文件
 rm "$LEAF_NAMES_TMP"
