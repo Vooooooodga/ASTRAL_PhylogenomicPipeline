@@ -96,7 +96,7 @@ echo "🗺️ 开始生成 ASTRAL 映射文件..."
 
 # 1. 提取所有唯一的叶节点名
 echo "  -> 正在从 $IQ_TREE_DIR/*.treefile 提取所有叶节点名..."
-grep -Pho '(?<=[,(])\s*[^():;,\\[\\]]+\s*(?=:[\[\]\d.eE+-]+)' "$IQ_TREE_DIR"/*.treefile | \
+grep -Pho '(?<=[,(])\\s*[^():;,\\\\[\\\\]]+\\s*(?=:[\ \\d.eE+-]+)\' "$IQ_TREE_DIR"/*.treefile | \
     sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | \
     sort | \
     uniq > "$LEAF_NAMES_TMP"

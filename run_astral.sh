@@ -99,9 +99,9 @@ if [ -n "$ASTRAL_MAPPING_FILE" ]; then
     astral_cmd_array+=(-a "$ASTRAL_MAPPING_FILE")
 fi
 
-if [ -n "$INPUT_BOOTSTRAP_LIST_FILE" ]; then
-    astral_cmd_array+=(-b "$INPUT_BOOTSTRAP_LIST_FILE")
-fi
+# if [ -n "$INPUT_BOOTSTRAP_LIST_FILE" ]; then
+#     astral_cmd_array+=(-b "$INPUT_BOOTSTRAP_LIST_FILE")
+# fi
 
 echo "执行命令: ${astral_cmd_array[@]}"
 "${astral_cmd_array[@]}" 2> "${OUTPUT_SPECIES_TREE_FILE%.*}.log"
