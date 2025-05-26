@@ -148,10 +148,6 @@ echo "设置 _JAVA_OPTIONS=${_JAVA_OPTIONS}" # 显示设置，便于调试
 
 # 构建 ASTRAL 命令数组
 astral_cmd_array=($ASTRAL_EXEC_COMMAND) # 方括号改为圆括号初始化数组
-# 将 Java 内存选项直接传递给 ASTRAL
-if [ -n "$ASTRAL_JAVA_MEMORY" ]; then
-    astral_cmd_array+=("-J-Xmx${ASTRAL_JAVA_MEMORY}")
-fi
 astral_cmd_array+=(-i "$INPUT_MERGED_TREES_FILE")
 astral_cmd_array+=(-o "$OUTPUT_SPECIES_TREE_FILE")
 
