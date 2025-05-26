@@ -178,6 +178,7 @@ astral_cmd_array+=(--outgroup "Drosophila_melanogaster")
 
 if [ -n "$ASTRAL_MAPPING_FILE" ]; then
     astral_cmd_array+=(-a "$ASTRAL_MAPPING_FILE")
+    astral_cmd_array+=(-R) # 根据用户请求添加 -R 参数，与 -a 一起使用
 fi
 
 # if [ -n "$INPUT_BOOTSTRAP_LIST_FILE" ]; then
