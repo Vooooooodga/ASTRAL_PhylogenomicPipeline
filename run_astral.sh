@@ -14,15 +14,15 @@
 # ******************************************************************
 # ** 请务必在这里设置正确的文件路径！**
 # 中文注释：包含所有基因树的合并文件 (例如: ml_best.trees)
-INPUT_MERGED_TREES_FILE="nc_species_mapped.tre"
+INPUT_MERGED_TREES_FILE="aa_species_mapped.tre"
 # 中文注释：包含所有 Bootstrap 树文件名的列表文件 (例如: ml_boot.txt)
 # 如果您不想使用 Bootstrap 支持度，请将此行注释掉或留空。
-INPUT_BOOTSTRAP_LIST_FILE="nc_species_mapped_bootstraps.txt"
+INPUT_BOOTSTRAP_LIST_FILE="aa_species_mapped_bootstraps.txt"
 # 中文注释：ASTRAL 物种/基因映射文件 (例如: astral_mapping.txt)
 # 使用 -a 选项时需要。如果不需要，请留空或注释掉。
 # ASTRAL_MAPPING_FILE="astral_mapping.txt" # COMMENTED OUT: Python脚本已完成映射，不再需要此文件和 -a 选项
 # 中文注释：ASTRAL 输出的物种树文件名 (例如：astral_species_tree.tre)
-OUTPUT_SPECIES_TREE_FILE="astral_species_tree_with_nc.tree"
+OUTPUT_SPECIES_TREE_FILE="astral_species_tree_with_aa.tree"
 # ******************************************************************
 # 中文注释：ASTRAL 的可执行命令。可以是简单的命令名 (如 'astral')，
 # 也可以是完整的路径 (如 '/usr/local/bin/astral')，
