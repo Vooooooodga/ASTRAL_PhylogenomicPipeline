@@ -4,6 +4,7 @@
 import argparse
 import os
 import sys
+import multiprocessing
 
 def parse_mapping_file(mapping_file_path):
     """
@@ -70,13 +71,12 @@ def process_tree_content(tree_content, gene_to_species_map):
     
     # 按基因名长度降序排序，确保长名优先替换 (例如 "ABC_1" 在 "ABC" 之前)
     # 这对于 simple string.replace(f"{gene}:", f"{species}:") 策略很重要
+    # 对于超大量替换规则和超长字符串，此方法仍可能较慢，但对于一般树文件是合理的。
     sorted_gene_names = sorted(gene_to_species_map.keys(), key=len, reverse=True)
 
     for gene_name in sorted_gene_names:
         species_name = gene_to_species_map[gene_name]
         
-        # 构建查找和替换的模式： "基因名:" -> "物种名:"
-        # 这是 Newick 格式中叶节点名的常见形式 (LeafName:BranchLength)
         find_pattern = f"{gene_name}:"
         replace_with = f"{species_name}:"
         modified_content = modified_content.replace(find_pattern, replace_with)
@@ -86,6 +86,7 @@ def process_tree_content(tree_content, gene_to_species_map):
 def process_single_tree_file(input_path, output_path, gene_to_species_map):
     """
     读取输入树文件，替换基因名，并将结果写入输出树文件。
+    此函数会被worker调用，也用于主树文件。
     """
     try:
         with open(input_path, 'r', encoding='utf-8') as f_in:
@@ -95,17 +96,43 @@ def process_single_tree_file(input_path, output_path, gene_to_species_map):
         
         with open(output_path, 'w', encoding='utf-8') as f_out:
             f_out.write(modified_content)
-        return True
+        return True # 表示成功
     except FileNotFoundError:
-        print(f"错误: 输入树文件 '{input_path}' 未找到。", file=sys.stderr)
+        # 此处打印错误信息，以便worker可以捕获到是哪个文件找不到
+        print(f"错误 (process_single_tree_file): 输入树文件 '{input_path}' 未找到。", file=sys.stderr)
         return False
     except Exception as e:
-        print(f"错误: 处理树文件 '{input_path}' 到 '{output_path}' 失败: {e}", file=sys.stderr)
+        print(f"错误 (process_single_tree_file): 处理树文件 '{input_path}' 到 '{output_path}' 失败: {e}", file=sys.stderr)
         return False
+
+# --- Worker function for multiprocessing ---
+# 必须是顶级函数才能被 pickle
+def worker_process_bootstrap_file(original_boot_file_path, output_dir, gene_to_species_map_local):
+    """
+    Worker 函数，用于并行处理单个 bootstrap 文件。
+    original_boot_file_path: 原始 bootstrap 文件的路径。
+    output_dir: 保存修改后文件的目录。
+    gene_to_species_map_local: 基因到物种的映射字典。
+    返回新文件的路径 (如果成功)，否则返回 None。
+    """
+    try:
+        boot_filename = os.path.basename(original_boot_file_path)
+        new_boot_file_path = os.path.join(output_dir, boot_filename)
+
+        if process_single_tree_file(original_boot_file_path, new_boot_file_path, gene_to_species_map_local):
+            return new_boot_file_path # 成功，返回新路径
+        else:
+            # process_single_tree_file 内部已打印具体错误
+            return None # 失败
+    except Exception as e:
+        # 捕获 worker 内部的意外错误
+        print(f"错误 (Worker): 处理文件 '{original_boot_file_path}' 时发生意外错误: {e}", file=sys.stderr)
+        return None
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="将 Newick 格式树文件中的基因叶节点名替换为对应的物种名。",
+        description="将 Newick 格式树文件中的基因叶节点名替换为对应的物种名。使用多进程加速 bootstrap 文件处理。",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""示例:
   python3 %(prog)s nc_best.trees nc_ml_boot.txt astral_mapping.txt nc_species_mapped"""
@@ -114,6 +141,8 @@ def main():
     parser.add_argument("original_bootstrap_list_file", help="包含原始 bootstrap 树文件路径的列表文件 (例如: nc_ml_boot.txt)")
     parser.add_argument("astral_mapping_file", help="ASTRAL 映射文件的路径 (格式: 物种名:基因名1,基因名2,...)")
     parser.add_argument("output_basename", help="用于生成输出文件和目录的基本名称 (例如: nc_species_mapped)")
+    parser.add_argument("--num_workers", type=int, default=os.cpu_count(), help="用于处理 bootstrap 文件的并行工作进程数量 (默认为系统CPU核心数)")
+
 
     args = parser.parse_args()
 
@@ -156,48 +185,68 @@ def main():
         print("错误: 处理主树文件失败。正在退出。", file=sys.stderr)
         sys.exit(1)
 
-    # --- 处理 Bootstrap 文件 ---
-    print(f"INFO: 正在处理来自 '{args.original_bootstrap_list_file}' 的 bootstrap 文件，输出到目录 '{new_bootstrap_dir}'...")
+    # --- 处理 Bootstrap 文件 (并行) ---
+    print(f"INFO: 准备处理来自 '{args.original_bootstrap_list_file}' 的 bootstrap 文件，输出到目录 '{new_bootstrap_dir}'...")
     
-    num_boot_processed = 0
-    num_boot_failed = 0
-    
+    tasks_for_workers = []
+    bootstrap_paths_not_found_or_unreadable = 0
+
     try:
-        with open(new_bootstrap_list_file, 'w', encoding='utf-8') as f_new_list:
-            try:
-                with open(args.original_bootstrap_list_file, 'r', encoding='utf-8') as f_orig_list:
-                    for line_num, original_boot_file_path_raw in enumerate(f_orig_list, 1):
-                        original_boot_file_path = original_boot_file_path_raw.strip()
-                        if not original_boot_file_path: # 跳过空行
-                            continue
+        with open(args.original_bootstrap_list_file, 'r', encoding='utf-8') as f_orig_list:
+            for line_num, original_boot_file_path_raw in enumerate(f_orig_list, 1):
+                original_boot_file_path = original_boot_file_path_raw.strip()
+                if not original_boot_file_path: # 跳过空行
+                    continue
 
-                        if not os.path.isfile(original_boot_file_path):
-                            print(f"警告 (bootstrap列表文件 第 {line_num} 行): 文件 '{original_boot_file_path}' 未找到或不是有效文件，已跳过。", file=sys.stderr)
-                            num_boot_failed += 1
-                            continue
-                        
-                        boot_filename = os.path.basename(original_boot_file_path)
-                        new_boot_file_path = os.path.join(new_bootstrap_dir, boot_filename)
-
-                        if process_single_tree_file(original_boot_file_path, new_boot_file_path, gene_to_species_map):
-                            f_new_list.write(f"{new_boot_file_path}\n")
-                            num_boot_processed += 1
-                        else:
-                            # 错误信息已由 process_single_tree_file 打印
-                            num_boot_failed += 1
-            except FileNotFoundError:
-                print(f"错误: 原始 bootstrap 列表文件 '{args.original_bootstrap_list_file}' 未找到。", file=sys.stderr)
-                sys.exit(1) 
-            except Exception as e:
-                print(f"错误: 读取原始 bootstrap 列表文件 '{args.original_bootstrap_list_file}' 时发生未知错误: {e}", file=sys.stderr)
-                sys.exit(1)
-    except IOError as e:
-        print(f"错误: 无法写入新的 bootstrap 列表文件 '{new_bootstrap_list_file}': {e}", file=sys.stderr)
+                if not os.path.isfile(original_boot_file_path):
+                    print(f"警告 (bootstrap列表文件 第 {line_num} 行): 文件 '{original_boot_file_path}' 未找到或不是有效文件，已跳过。", file=sys.stderr)
+                    bootstrap_paths_not_found_or_unreadable += 1
+                    continue
+                # 准备传递给worker的参数元组
+                tasks_for_workers.append((original_boot_file_path, new_bootstrap_dir, gene_to_species_map))
+    except FileNotFoundError:
+        print(f"错误: 原始 bootstrap 列表文件 '{args.original_bootstrap_list_file}' 未找到。", file=sys.stderr)
+        sys.exit(1) 
+    except Exception as e:
+        print(f"错误: 读取原始 bootstrap 列表文件 '{args.original_bootstrap_list_file}' 时发生未知错误: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"INFO: 已成功处理 {num_boot_processed} 个 bootstrap 文件。")
-    if num_boot_failed > 0:
-        print(f"警告: {num_boot_failed} 个 bootstrap 文件处理失败或被跳过。", file=sys.stderr)
+    processed_new_boot_paths = []
+    if tasks_for_workers:
+        num_actual_workers = min(args.num_workers, len(tasks_for_workers)) # 确保工作进程数不超过任务数
+        if num_actual_workers <= 0 : num_actual_workers = 1 # 至少1个
+
+        print(f"INFO: 使用 {num_actual_workers} 个工作进程并行处理 {len(tasks_for_workers)} 个 bootstrap 文件...")
+        
+        # 在Windows上，如果gene_to_species_map非常大，传递它可能会慢。
+        # 但对于大多数情况，这是标准做法。
+        with multiprocessing.Pool(processes=num_actual_workers) as pool:
+            results = pool.starmap(worker_process_bootstrap_file, tasks_for_workers)
+        
+        processed_new_boot_paths = [path for path in results if path is not None] # 过滤掉失败的 (None)
+        num_boot_processed_successfully = len(processed_new_boot_paths)
+        num_boot_processing_failed_in_workers = len(tasks_for_workers) - num_boot_processed_successfully
+    else:
+        print("INFO: 没有 bootstrap 文件需要处理。")
+        num_boot_processed_successfully = 0
+        num_boot_processing_failed_in_workers = 0
+        
+    # 写入新的 bootstrap 列表文件
+    try:
+        with open(new_bootstrap_list_file, 'w', encoding='utf-8') as f_new_list:
+            if processed_new_boot_paths:
+                for new_path in processed_new_boot_paths:
+                    f_new_list.write(f"{new_path}\\n")
+        print(f"INFO: 新的 bootstrap 列表文件 '{new_bootstrap_list_file}' 已生成。")
+    except IOError as e:
+        print(f"错误: 无法写入新的 bootstrap 列表文件 '{new_bootstrap_list_file}': {e}", file=sys.stderr)
+        # 即使这里失败，转换后的文件也可能已在目录中生成
+        
+    total_boot_failed = bootstrap_paths_not_found_or_unreadable + num_boot_processing_failed_in_workers
+
+    print(f"INFO: 已成功处理 {num_boot_processed_successfully} 个 bootstrap 文件。")
+    if total_boot_failed > 0:
+        print(f"警告: 总共有 {total_boot_failed} 个 bootstrap 文件未能处理 (包括未找到或处理中失败)。", file=sys.stderr)
 
     # --- 完成 ---
     print("==================================================")
@@ -205,9 +254,13 @@ def main():
     print(f"  新的物种名映射树文件: {new_tree_file}")
     print(f"  新的物种名映射 bootstrap 文件位于目录: {new_bootstrap_dir}")
     print(f"  新的 bootstrap 文件列表: {new_bootstrap_list_file}")
-    if num_boot_failed > 0:
+    if total_boot_failed > 0:
         print("  请检查以上与处理失败的 bootstrap 文件相关的错误或警告信息。")
     print("==================================================")
 
 if __name__ == "__main__":
+    # 在 Windows 上使用 multiprocessing 时，需要此保护块。
+    # 它确保 main() 只在脚本直接运行时执行，而不是在每个子进程中重新执行。
+    # 对于 Linux/macOS，它也是一个好习惯。
+    multiprocessing.freeze_support() # 对于打包成可执行文件时有用 (如用PyInstaller)
     main() 
