@@ -105,8 +105,23 @@ echo "  -> 找到 $(wc -l < "$LEAF_NAMES_TMP") 个独特的叶节点名。"
 # 2. 使用 Python 进行最长前缀匹配并生成映射文件
 echo "  -> 正在匹配基础物种名并生成 $OUTPUT_MAP_FILE..."
 
+# --- DEBUG: Check BASE_NAMES status ---
+echo "DEBUG (Bash): Count of BASE_NAMES: ${#BASE_NAMES[@]}"
+if [ "${#BASE_NAMES[@]}" -gt 0 ]; then
+    echo "DEBUG (Bash): First element of BASE_NAMES: '${BASE_NAMES[0]}'"
+    echo "DEBUG (Bash): Last element of BASE_NAMES: '${BASE_NAMES[${#BASE_NAMES[@]}-1]}'" # More compatible way for last element
+else
+    echo "DEBUG (Bash): BASE_NAMES array is empty!"
+fi
+# --- END DEBUG ---
+
 # 将 Bash 数组转换为 Python 可读的列表字符串
-PYTHON_BASE_NAMES="['$(printf "', '" "${BASE_NAMES[@]}")']"
+_python_list_content=""
+if [ "${#BASE_NAMES[@]}" -gt 0 ]; then
+    _python_list_content=$(printf "'%s'," "${BASE_NAMES[@]}" | sed 's/,$//')
+fi
+PYTHON_BASE_NAMES="[${_python_list_content}]"
+echo "DEBUG (Bash): Generated PYTHON_BASE_NAMES string: $PYTHON_BASE_NAMES" # Added for clarity
 
 python3 - << EOF 2> python_debug_output.txt
 import sys
