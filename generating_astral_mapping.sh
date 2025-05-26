@@ -96,6 +96,25 @@ echo "🗺️ 开始生成 ASTRAL 映射文件..."
 
 # 1. 提取所有唯一的叶节点名
 echo "  -> 正在从 $IQ_TREE_DIR/*.treefile 提取所有叶节点名..."
+
+# --- DEBUG: 检查 .treefile 文件和提取过程 ---
+echo "DEBUG: 准备从 $IQ_TREE_DIR/*.treefile 提取叶节点名"
+_first_tree_file_for_debug=$(find "$IQ_TREE_DIR" -maxdepth 1 -name '*.treefile' -print | head -n 1)
+
+if [ -n "$_first_tree_file_for_debug" ]; then
+    echo "DEBUG: 找到至少一个 .treefile 文件进行抽样检查: $_first_tree_file_for_debug"
+    echo "DEBUG: 该文件的前3行内容是:"
+    head -n 3 "$_first_tree_file_for_debug"
+    echo "DEBUG: 对该文件运行 grep 命令的输出 (最多显示5条匹配):"
+    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$_first_tree_file_for_debug" | head -n 5
+    echo "DEBUG: 对该文件运行 grep | sed 管道命令的输出 (最多显示5条匹配):"
+    grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$_first_tree_file_for_debug" | \
+        sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | head -n 5
+else
+    echo "DEBUG: 在 $IQ_TREE_DIR 目录中未找到用于调试的 .treefile 文件。"
+fi
+# --- END DEBUG ---
+
 grep -hoE '([,(]|^)\s*[^():;,[:space:]]+\s*:[:\d.eE+-]+' "$IQ_TREE_DIR"/*.treefile | \
     sed -E 's/^[[:space:]]*[,(]//; s/:[\d.eE+-]+[[:space:]]*$//; s/^[[:space:]]*//;s/[[:space:]]*$//' | \
     sort | \
@@ -160,8 +179,7 @@ try:
     with open('$OUTPUT_MAP_FILE', 'w') as out:
         for base, leaves in mapping.items():
             if leaves: # 只为那些实际有叶节点匹配的基础物种名写入条目
-                out.write(f'{base}: {",".join(leaves)}
-')
+                out.write(f'{base}: {",".join(leaves)}\n')
 except IOError:
     print("错误: 无法写入输出文件 '$OUTPUT_MAP_FILE'。", file=sys.stderr)
     sys.exit(1)
